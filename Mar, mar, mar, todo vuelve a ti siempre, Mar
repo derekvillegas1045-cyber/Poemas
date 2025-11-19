@@ -98,7 +98,7 @@ const PoemaApp = () => {
               size={24} 
               className={`transition-all duration-300 ${liked ? 'fill-red-500 text-red-500 scale-110' : 'text-white'}`} 
             />
-            <span className="text-sm font-medium">{liked ? 'Amado' : 'Amar'}</span>
+            <span className="text-sm font-medium">{liked ? 'Amado' : 'Love'}</span>
           </button>
 
           <button 
