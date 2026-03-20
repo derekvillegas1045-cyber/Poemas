@@ -14,13 +14,13 @@
     
     <!-- Fuentes elegantes -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Lato:wght@300;400&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Lato', sans-serif;
         }
-        .font-serif {
-            font-family: 'Playfair Display', serif;
+        .font-dancing {
+            font-family: 'Dancing Script', cursive;
         }
         @keyframes float {
             0% { transform: translateY(0px); }
@@ -212,7 +212,7 @@
                                     <React.Fragment key={rowIndex}>
                                         {/* Columna izquierda */}
                                         <p 
-                                            className={`font-serif text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform 
+                                            className={`font-dancing text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform 
                                                 ${row.left.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
                                                 ${row.left.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}
                                                 ${isLastRow && !row.right ? 'md:col-span-2 text-center' : 'text-left md:text-right'}`}
@@ -222,7 +222,7 @@
                                         {/* Columna derecha, si existe */}
                                         {row.right && (
                                             <p 
-                                                className={`font-serif text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform text-left
+                                                className={`font-dancing text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform text-left
                                                     ${row.right.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
                                                     ${row.right.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
                                             >
@@ -356,7 +356,7 @@
                                     return (
                                         <p 
                                             key={index}
-                                            className={`font-serif text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
+                                            className={`font-dancing text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
                                                 ${index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'} 
                                                 ${index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
                                         >
