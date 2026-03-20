@@ -30,6 +30,14 @@
         .animate-float {
             animation: float 6s ease-in-out infinite;
         }
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        }
+        .animate-pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-white overflow-x-hidden">
@@ -38,7 +46,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Iconos SVG simples para no depender de librerías externas
+        // Iconos SVG
         const HeartIcon = ({ filled }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
@@ -58,54 +66,117 @@
             </svg>
         );
 
-        const App = () => {
+        const GiftIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8v12"/><path d="M8 8v2"/><path d="M16 8v2"/><path d="M7.5 8 12 3l4.5 5"/>
+            </svg>
+        );
+
+        const BackIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+        );
+
+        // Poema original
+        const poemLinesOriginal = [
+            { text: "Tu existencia es un regalo", delay: 500 },
+            { text: "Tus palabras una oda a la belleza", delay: 1500 },
+            { text: "Quiero abrazarte hasta que muera", delay: 2500 },
+            { text: "Y eliminar todo lo que es malo", delay: 3500 },
+            { spacer: true, delay: 4000 },
+            { text: "Estaré para ti", delay: 4500 },
+            { text: "quizá no con las manos cocidas", delay: 5500 },
+            { text: "Pero sí con el corazón fusionado", delay: 6500 },
+            { text: "Llegamos a ser uno mismo", delay: 7500 },
+            { text: "siempre y todos los días", delay: 8500 },
+            { spacer: true, delay: 9000 },
+            { text: "Vivimos en la incertidumbre", delay: 9500 },
+            { text: "del ¿Cuánto me quiere?", delay: 10500 },
+            { text: "pero contigo no existe", delay: 11500 },
+            { text: "porque me lo demuestras diariamente.", delay: 12500 },
+            { spacer: true, delay: 13000 },
+            { text: "Permíteme seguir estando", delay: 13500 },
+            { text: "Permíteme seguir hablando", delay: 14500 },
+            { text: "pero también seguir escuchando.", delay: 15500 }
+        ];
+
+        // Nuevo poema para el regalo 23 (cada línea es un verso)
+        const poemLinesRegalo = [
+            "Siento que no estoy para ti, que mereces más",
+            "Creo que tu amor va muy lejos, aquí y allá",
+            "Tus abrazos cálidos y que dan mucha paz",
+            "Reconfortantes como el rojo de tu cabellera",
+            "Quemándome como un millón de soles",
+            "Tratando de mantenerse un poco estables",
+            "Colapsando para dar paso a una vida nueva",
+            "Una aventura sin nubes grises que lluevan",
+            "Porque no importa cuantas lagrimas caigan",
+            "Son gotas mojadas que a ti nunca te apagan",
+            "Tremenda dualidad que tienes en tu ser",
+            "Llevando el Mar en tu nombre primero",
+            "Pero en el corazón un fuego eterno",
+            "Que luchan por un espacio y permanecer",
+            "Quedándose como yo en tus días",
+            "Incrustado en tus buenas memorias",
+            "En tus cumpleaños completos siempre",
+            "Y en los medios sin falta estar",
+            "Siendo un solo ser buscando ser libre",
+            "Y espero que eso no llegue a faltar",
+            "Te debo mi vida, al ser mi gran ancla",
+            "Te ofrezco mis palabras, mi pobre alma",
+            "Proporcionas algo, como tranquilidad",
+            "Porque tu siempre me dices la verdad",
+            "Sin importar el cómo pueda yo actuar",
+            "Cuando genuinamente volveré a estar",
+            "No pienso que me veas ausentar",
+            "Pero si llegara yo no más nunca cantar",
+            "Que no me puedas otra vez escuchar",
+            "Sepas que mi corazón en pausa teatral",
+            "Seguirá recordando tu suave y fino tocar",
+            "Esperando volver a sentir el vibrar",
+            "De tus dedos pasando sin algo afinar",
+            "Extrañando el sonido de tu risa",
+            "Pero deseando una reunión a prisa",
+            "Aun sin desear una reunión fatídica",
+            "Algo que se sienta como crítica",
+            "Si me voy no espero que me acompañes",
+            "Porque tu vives bien, aunque quizá llores",
+            "No quiero ser el ancla de tus olas",
+            "Más bien las nubes que acompañan",
+            "Las sales disueltas las cuales te bañan",
+            "No retenerte, para que nunca estés sola",
+            "Fumar tus ideas con mis labios partidos",
+            "Disfrutar la pureza de tus palabras",
+            "Deleitando la inmundicia de mis oídos",
+            "Entrando las ondas en las grietas",
+            "Propagando la belleza, dejando marca",
+            "Como una mordida roja, que sangra",
+            "Permanentemente tuya",
+            "Blanca como muñequita de porcelana."
+        ];
+
+        // Componente del regalo 23 con el mismo formato que el poema principal
+        const Regalo23 = ({ onVolver }) => {
             const [liked, setLiked] = useState(false);
             const [showToast, setShowToast] = useState(false);
             const [visibleLines, setVisibleLines] = useState(0);
 
-            const poemLines = [
-                { text: "Tu existencia es un regalo", delay: 500 },
-                { text: "Tus palabras una oda a la belleza", delay: 1500 },
-                { text: "Quiero abrazarte hasta que muera", delay: 2500 },
-                { text: "Y eliminar todo lo que es malo", delay: 3500 },
-                { spacer: true, delay: 4000 },
-                { text: "Estaré para ti", delay: 4500 },
-                { text: "quizá no con las manos cocidas", delay: 5500 },
-                { text: "Pero sí con el corazón fusionado", delay: 6500 },
-                { text: "Llegamos a ser uno mismo", delay: 7500 },
-                { text: "siempre y todos los días", delay: 8500 },
-                { spacer: true, delay: 9000 },
-                { text: "Vivimos en la incertidumbre", delay: 9500 },
-                { text: "del ¿Cuánto me quiere?", delay: 10500 },
-                { text: "pero contigo no existe", delay: 11500 },
-                { text: "porque me lo demuestras diariamente.", delay: 12500 },
-                { spacer: true, delay: 13000 },
-                { text: "Permíteme seguir estando", delay: 13500 },
-                { text: "Permíteme seguir hablando", delay: 14500 },
-                { text: "pero también seguir escuchando.", delay: 15500 }
-            ];
-
             useEffect(() => {
                 const timer = setInterval(() => {
-                    setVisibleLines(prev => (prev < poemLines.length ? prev + 1 : prev));
-                }, 800);
+                    setVisibleLines(prev => (prev < poemLinesRegalo.length ? prev + 1 : prev));
+                }, 400);
                 return () => clearInterval(timer);
             }, []);
 
             const handleShare = () => {
-                const fullPoem = poemLines
-                    .filter(line => !line.spacer)
-                    .map(line => line.text)
-                    .join('\n');
-                
-                // Intento moderno de compartir (celulares)
+                const fullPoem = poemLinesRegalo.join('\n');
                 if (navigator.share) {
                     navigator.share({
-                        title: 'Para ti',
+                        title: 'No. 23',
                         text: fullPoem,
                     }).catch(console.error);
                 } else {
-                    // Fallback para PC
                     navigator.clipboard.writeText(fullPoem).then(() => {
                         setShowToast(true);
                         setTimeout(() => setShowToast(false), 3000);
@@ -113,48 +184,60 @@
                 }
             };
 
+            // Agrupar versos en pares para las dos columnas
+            const rows = [];
+            for (let i = 0; i < poemLinesRegalo.length; i += 2) {
+                rows.push({
+                    left: { text: poemLinesRegalo[i], index: i },
+                    right: i + 1 < poemLinesRegalo.length ? { text: poemLinesRegalo[i + 1], index: i + 1 } : null
+                });
+            }
+
             return (
-                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 relative">
-                    
-                    {/* Decoración de fondo */}
-                    <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                        <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-pink-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float"></div>
-                        <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float" style={{animationDelay: '2s'}}></div>
+                <div className="relative z-10 max-w-4xl w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
+                    {/* Cabecera */}
+                    <div className="h-48 bg-gradient-to-b from-pink-500/20 to-transparent flex items-center justify-center flex-col relative group">
+                        <div className="text-7xl font-bold text-pink-300 animate-pulse">23</div>
+                        <div className="mt-2 text-xs text-pink-200 uppercase tracking-[0.2em] opacity-80 font-bold">
+                            ¿Dónde se supone que estás?
+                        </div>
                     </div>
 
-                    {/* Tarjeta Principal */}
-                    <div className="relative z-10 max-w-md w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
-                        
-                        {/* Cabecera */}
-                        <div className="h-48 bg-gradient-to-b from-pink-500/20 to-transparent flex items-center justify-center flex-col relative group">
-                            <div className="transform transition-transform duration-700 group-hover:rotate-12">
-                                <FeatherIcon />
-                            </div>
-                            <div className="mt-4 text-xs text-pink-200 uppercase tracking-[0.2em] opacity-80 font-bold">
-                                Mar Mar Mar, siempre eres tu Mar.
-                            </div>
-                        </div>
-
-                        {/* Contenido del Poema */}
-                        <div className="px-8 pb-8 pt-2 min-h-[400px] flex flex-col justify-center items-center text-center">
-                            {poemLines.map((line, index) => {
-                                if (line.spacer) return <div key={index} className="h-6 w-full"></div>;
-                                
+                    {/* Contenido del poema en dos columnas */}
+                    <div className="px-4 md:px-8 pb-8 pt-2 min-h-[400px] flex flex-col items-center text-center">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 w-full">
+                            {rows.map((row, rowIndex) => {
+                                const isLastRow = rowIndex === rows.length - 1;
                                 return (
-                                    <p 
-                                        key={index}
-                                        className={`font-serif text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
-                                            ${index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'} 
-                                            ${index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
-                                    >
-                                        {line.text}
-                                    </p>
+                                    <React.Fragment key={rowIndex}>
+                                        {/* Columna izquierda */}
+                                        <p 
+                                            className={`font-serif text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform 
+                                                ${row.left.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
+                                                ${row.left.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}
+                                                ${isLastRow && !row.right ? 'md:col-span-2 text-center' : 'text-left md:text-right'}`}
+                                        >
+                                            {row.left.text}
+                                        </p>
+                                        {/* Columna derecha, si existe */}
+                                        {row.right && (
+                                            <p 
+                                                className={`font-serif text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform text-left
+                                                    ${row.right.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
+                                                    ${row.right.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
+                                            >
+                                                {row.right.text}
+                                            </p>
+                                        )}
+                                    </React.Fragment>
                                 );
                             })}
                         </div>
+                    </div>
 
-                        {/* Pie de página / Acciones */}
-                        <div className="bg-black/20 p-4 flex justify-between items-center backdrop-blur-lg border-t border-white/5">
+                    {/* Pie de página con acciones y botón de volver */}
+                    <div className="bg-black/20 p-4 flex flex-col md:flex-row justify-between items-center gap-4 backdrop-blur-lg border-t border-white/5">
+                        <div className="flex gap-2">
                             <button 
                                 onClick={() => setLiked(!liked)}
                                 className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95 group"
@@ -175,10 +258,141 @@
                                 <span className="text-sm font-medium text-white">Compartir</span>
                             </button>
                         </div>
+
+                        <button 
+                            onClick={onVolver}
+                            className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
+                        >
+                            <BackIcon className="text-white" />
+                            <span className="text-sm font-medium text-white">Volver al Inicio</span>
+                        </button>
                     </div>
 
-                    {/* Notificación Toast */}
-                    <div className={`fixed bottom-10 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-50
+                    {/* Toast para copiado */}
+                    <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-50
+                        ${showToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'}`}>
+                        ✨ Poema del regalo copiado
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [liked, setLiked] = useState(false);
+            const [showToast, setShowToast] = useState(false);
+            const [visibleLines, setVisibleLines] = useState(0);
+            const [mostrarRegalo, setMostrarRegalo] = useState(false);
+
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setVisibleLines(prev => (prev < poemLinesOriginal.length ? prev + 1 : prev));
+                }, 800);
+                return () => clearInterval(timer);
+            }, []);
+
+            const handleShare = () => {
+                const fullPoem = poemLinesOriginal
+                    .filter(line => !line.spacer)
+                    .map(line => line.text)
+                    .join('\n');
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Para ti',
+                        text: fullPoem,
+                    }).catch(console.error);
+                } else {
+                    navigator.clipboard.writeText(fullPoem).then(() => {
+                        setShowToast(true);
+                        setTimeout(() => setShowToast(false), 3000);
+                    });
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 relative">
+                    
+                    {/* Decoración de fondo */}
+                    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                        <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-pink-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float" style={{animationDelay: '2s'}}></div>
+                    </div>
+
+                    {/* Botón flotante lateral derecho (solo visible en el poema) */}
+                    {!mostrarRegalo && (
+                        <button
+                            onClick={() => setMostrarRegalo(true)}
+                            className="fixed right-4 top-1/2 -translate-y-1/2 z-20 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-3 rounded-l-2xl rounded-r-full shadow-2xl flex items-center gap-2 hover:from-pink-600 hover:to-purple-700 transition-all transform hover:scale-105 animate-pulse-glow border border-white/20"
+                            style={{ writingMode: 'horizontal-tb' }}
+                        >
+                            <GiftIcon className="w-5 h-5" />
+                            <span className="font-medium text-sm md:text-base whitespace-nowrap">Abre tu regalo No. 23</span>
+                            <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-pink-300 rounded-full animate-ping"></div>
+                        </button>
+                    )}
+
+                    {/* Contenido condicional */}
+                    {mostrarRegalo ? (
+                        <Regalo23 onVolver={() => setMostrarRegalo(false)} />
+                    ) : (
+                        /* Tarjeta Principal del Poema */
+                        <div className="relative z-10 max-w-md w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
+                            
+                            {/* Cabecera */}
+                            <div className="h-48 bg-gradient-to-b from-pink-500/20 to-transparent flex items-center justify-center flex-col relative group">
+                                <div className="transform transition-transform duration-700 group-hover:rotate-12">
+                                    <FeatherIcon />
+                                </div>
+                                <div className="mt-4 text-xs text-pink-200 uppercase tracking-[0.2em] opacity-80 font-bold">
+                                    Mar Mar Mar, siempre eres tu Mar.
+                                </div>
+                            </div>
+
+                            {/* Contenido del Poema */}
+                            <div className="px-8 pb-8 pt-2 min-h-[400px] flex flex-col justify-center items-center text-center">
+                                {poemLinesOriginal.map((line, index) => {
+                                    if (line.spacer) return <div key={index} className="h-6 w-full"></div>;
+                                    
+                                    return (
+                                        <p 
+                                            key={index}
+                                            className={`font-serif text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
+                                                ${index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'} 
+                                                ${index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
+                                        >
+                                            {line.text}
+                                        </p>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Pie de página / Acciones */}
+                            <div className="bg-black/20 p-4 flex justify-between items-center backdrop-blur-lg border-t border-white/5">
+                                <button 
+                                    onClick={() => setLiked(!liked)}
+                                    className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95 group"
+                                >
+                                    <div className={`transition-transform duration-300 ${liked ? 'scale-125' : 'group-hover:scale-110'}`}>
+                                        <HeartIcon filled={liked} className={liked ? 'text-red-500' : 'text-white'} />
+                                    </div>
+                                    <span className={`text-sm font-medium transition-colors ${liked ? 'text-red-200' : 'text-white'}`}>
+                                        {liked ? 'Lo siento' : 'Love'}
+                                    </span>
+                                </button>
+
+                                <button 
+                                    onClick={handleShare}
+                                    className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95"
+                                >
+                                    <ShareIcon className="text-white" />
+                                    <span className="text-sm font-medium text-white">Compartir</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Notificación Toast para el poema principal */}
+                    <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-50
                         ${showToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'}`}>
                         ✨ Poema copiado
                     </div>
