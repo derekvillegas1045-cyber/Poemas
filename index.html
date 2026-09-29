@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tu Existencia</title>
+    <title>Tu Existencia · Colección de poemas</title>
     <!-- Tailwind CSS para estilos rápidos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React y ReactDOM -->
@@ -11,7 +11,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <!-- Babel para traducir JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
+    <!-- Supabase (base de datos + autenticación) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Fuentes elegantes -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Lato:wght@300;400&display=swap" rel="stylesheet">
@@ -30,13 +32,21 @@
         .animate-float {
             animation: float 6s ease-in-out infinite;
         }
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .animate-pulse-glow {
-            animation: pulse-glow 2s infinite;
+        .animate-fade-up {
+            opacity: 0;
+            animation: fade-up 0.8s ease-out forwards;
+        }
+        @keyframes pop-heart {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.6); }
+            100% { transform: scale(1.25); }
+        }
+        .animate-pop-heart {
+            animation: pop-heart 0.4s ease-out forwards;
         }
     </style>
 </head>
@@ -46,365 +56,1038 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Iconos SVG
-        const HeartIcon = ({ filled }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        /* ==================================================================
+           CONFIGURACIÓN DE SUPABASE
+           1. Crea un proyecto gratis en https://supabase.com
+           2. Ejecuta el SQL de `supabase-setup.sql` en el SQL Editor.
+           3. Pega aquí tus credenciales (Dashboard → Settings → API):
+              - Project URL
+              - anon public key
+           Mientras estén los placeholders, la página funciona en "modo
+           local" con los poemas incluidos, sin login ni publicaciones.
+           ================================================================== */
+        const SUPABASE_URL = "PON_AQUI_TU_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "PON_AQUI_TU_SUPABASE_ANON_KEY";
+
+        const db = (() => {
+            try {
+                if (typeof window.supabase === "undefined") return null;
+                if (!SUPABASE_URL.startsWith("https://") || SUPABASE_ANON_KEY.length < 30) return null;
+                return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } catch (e) {
+                console.error("No se pudo inicializar Supabase:", e);
+                return null;
+            }
+        })();
+
+        /* ==================================================================
+           TEMAS VISUALES
+           Cada poema elige un tema: fondo de página, colores, tipografía.
+           ================================================================== */
+        const THEMES = {
+            rosa: {
+                name: "Rosa eterna",
+                pageBg: "from-slate-900 via-purple-900 to-slate-900",
+                cardHeader: "from-pink-500/30 to-transparent",
+                accent: "text-pink-300",
+                caption: "text-pink-200",
+                lineA: "text-pink-50",
+                lineB: "text-purple-100",
+                chip: "from-pink-500 to-purple-600",
+                border: "border-pink-300/30",
+                blobA: "bg-pink-600",
+                blobB: "bg-purple-600",
+                button: "from-pink-500 to-purple-600",
+                titleFont: "font-dancing",
+                bodyFont: "font-dancing",
+            },
+            medianoche: {
+                name: "Medianoche azul",
+                pageBg: "from-slate-950 via-blue-950 to-slate-900",
+                cardHeader: "from-blue-500/30 to-transparent",
+                accent: "text-sky-300",
+                caption: "text-sky-200",
+                lineA: "text-sky-50",
+                lineB: "text-blue-100",
+                chip: "from-sky-500 to-indigo-600",
+                border: "border-sky-300/30",
+                blobA: "bg-sky-600",
+                blobB: "bg-indigo-600",
+                button: "from-sky-500 to-indigo-600",
+                titleFont: "font-dancing",
+                bodyFont: "font-dancing",
+            },
+            atardecer: {
+                name: "Atardecer",
+                pageBg: "from-slate-950 via-orange-950 to-slate-900",
+                cardHeader: "from-amber-500/30 to-transparent",
+                accent: "text-amber-300",
+                caption: "text-amber-200",
+                lineA: "text-amber-50",
+                lineB: "text-orange-100",
+                chip: "from-amber-500 to-rose-600",
+                border: "border-amber-300/30",
+                blobA: "bg-amber-500",
+                blobB: "bg-rose-600",
+                button: "from-amber-500 to-rose-600",
+                titleFont: "font-dancing",
+                bodyFont: "font-dancing",
+            },
+            esmeralda: {
+                name: "Esmeralda",
+                pageBg: "from-slate-950 via-emerald-950 to-slate-900",
+                cardHeader: "from-emerald-500/30 to-transparent",
+                accent: "text-emerald-300",
+                caption: "text-emerald-200",
+                lineA: "text-emerald-50",
+                lineB: "text-teal-100",
+                chip: "from-emerald-500 to-teal-600",
+                border: "border-emerald-300/30",
+                blobA: "bg-emerald-600",
+                blobB: "bg-teal-600",
+                button: "from-emerald-500 to-teal-600",
+                titleFont: "font-dancing",
+                bodyFont: "font-dancing",
+            },
+            sepia: {
+                name: "Papel antiguo",
+                pageBg: "from-stone-900 via-yellow-950 to-stone-900",
+                cardHeader: "from-yellow-500/25 to-transparent",
+                accent: "text-yellow-200",
+                caption: "text-yellow-200/80",
+                lineA: "text-amber-100",
+                lineB: "text-stone-200",
+                chip: "from-yellow-600 to-stone-600",
+                border: "border-yellow-200/25",
+                blobA: "bg-yellow-700",
+                blobB: "bg-stone-600",
+                button: "from-yellow-600 to-stone-600",
+                titleFont: "font-['Playfair_Display',serif]",
+                bodyFont: "font-['Playfair_Display',serif]",
+            },
+        };
+
+        const THEME_KEYS = Object.keys(THEMES);
+
+        /* ==================================================================
+           POEMAS SEMILLA
+           Se publican automáticamente a la base de datos la primera vez
+           que la página se conecta a Supabase con la tabla vacía.
+           ================================================================== */
+        const POEM_SEED = [
+            {
+                title: "Tu Existencia",
+                dedicatory: "Mar Mar Mar, siempre eres tu Mar.",
+                author: "Anónimo",
+                theme: "rosa",
+                badge: null,
+                twoCol: false,
+                lines: [
+                    "Tu existencia es un regalo",
+                    "Tus palabras una oda a la belleza",
+                    "Quiero abrazarte hasta que muera",
+                    "Y eliminar todo lo que es malo",
+                    "",
+                    "Estaré para ti",
+                    "quizá no con las manos cocidas",
+                    "Pero sí con el corazón fusionado",
+                    "Llegamos a ser uno mismo",
+                    "siempre y todos los días",
+                    "",
+                    "Vivimos en la incertidumbre",
+                    "del ¿Cuánto me quiere?",
+                    "pero contigo no existe",
+                    "porque me lo demuestras diariamente.",
+                    "",
+                    "Permíteme seguir estando",
+                    "Permíteme seguir hablando",
+                    "pero también seguir escuchando.",
+                ],
+            },
+            {
+                title: "Regalo No. 23",
+                dedicatory: "¿Dónde se supone que estás?",
+                author: "Anónimo",
+                theme: "rosa",
+                badge: "23",
+                twoCol: true,
+                lines: [
+                    "Siento que no estoy para ti, que mereces más",
+                    "Creo que tu amor va muy lejos, aquí y allá",
+                    "Tus abrazos cálidos y que dan mucha paz",
+                    "Reconfortantes como el rojo de tu cabellera",
+                    "Quemándome como un millón de soles",
+                    "Tratando de mantenerse un poco estables",
+                    "Colapsando para dar paso a una vida nueva",
+                    "Una aventura sin nubes grises que lluevan",
+                    "Porque no importa cuantas lagrimas caigan",
+                    "Son gotas mojadas que a ti nunca te apagan",
+                    "Tremenda dualidad que tienes en tu ser",
+                    "Llevando el Mar en tu nombre primero",
+                    "Pero en el corazón un fuego eterno",
+                    "Que luchan por un espacio y permanecer",
+                    "Quedándose como yo en tus días",
+                    "Incrustado en tus buenas memorias",
+                    "En tus cumpleaños completos siempre",
+                    "Y en los medios sin falta estar",
+                    "Siendo un solo ser buscando ser libre",
+                    "Y espero que eso no llegue a faltar",
+                    "Te debo mi vida, al ser mi gran ancla",
+                    "Te ofrezco mis palabras, mi pobre alma",
+                    "Proporcionas algo, como tranquilidad",
+                    "Porque tu siempre me dices la verdad",
+                    "Sin importar el cómo pueda yo actuar",
+                    "Cuando genuinamente volveré a estar",
+                    "No pienso que me veas ausentar",
+                    "Pero si llegara yo no más nunca cantar",
+                    "Que no me puedas otra vez escuchar",
+                    "Sepas que mi corazón en pausa teatral",
+                    "Seguirá recordando tu suave y fino tocar",
+                    "Esperando volver a sentir el vibrar",
+                    "De tus dedos pasando sin algo afinar",
+                    "Extrañando el sonido de tu risa",
+                    "Pero deseando una reunión a prisa",
+                    "Aun sin desear una reunión fatídica",
+                    "Algo que se sienta como crítica",
+                    "Si me voy no espero que me acompañes",
+                    "Porque tu vives bien, aunque quizá llores",
+                    "No quiero ser el ancla de tus olas",
+                    "Más bien las nubes que acompañan",
+                    "Las sales disueltas las cuales te bañan",
+                    "No retenerte, para que nunca estés sola",
+                    "Fumar tus ideas con mis labios partidos",
+                    "Disfrutar la pureza de tus palabras",
+                    "Deleitando la inmundicia de mis oídos",
+                    "Entrando las ondas en las grietas",
+                    "Propagando la belleza, dejando marca",
+                    "Como una mordida roja, que sangra",
+                    "Permanentemente tuya",
+                    "Blanca como muñequita de porcelana.",
+                ],
+            },
+        ];
+
+        const rowToPoem = (r) => ({
+            id: r.id,
+            title: r.title,
+            dedicatory: r.dedicatory || "",
+            author: r.author || "Anónimo",
+            theme: THEMES[r.theme] ? r.theme : "rosa",
+            lines: Array.isArray(r.lines) ? r.lines : [],
+            badge: r.badge || null,
+            twoCol: !!r.columns,
+            userId: r.user_id || null,
+        });
+
+        /* ==================================================================
+           ICONOS SVG
+           ================================================================== */
+        const HeartIcon = ({ filled, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
             </svg>
         );
 
-        const ShareIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        const ShareIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
         );
 
-        const FeatherIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-pink-200 opacity-80">
+        const FeatherIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>
             </svg>
         );
 
-        const GiftIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8v12"/><path d="M8 8v2"/><path d="M16 8v2"/><path d="M7.5 8 12 3l4.5 5"/>
-            </svg>
-        );
-
-        const BackIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        const BackIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
             </svg>
         );
 
-        // Poema original
-        const poemLinesOriginal = [
-            { text: "Tu existencia es un regalo", delay: 500 },
-            { text: "Tus palabras una oda a la belleza", delay: 1500 },
-            { text: "Quiero abrazarte hasta que muera", delay: 2500 },
-            { text: "Y eliminar todo lo que es malo", delay: 3500 },
-            { spacer: true, delay: 4000 },
-            { text: "Estaré para ti", delay: 4500 },
-            { text: "quizá no con las manos cocidas", delay: 5500 },
-            { text: "Pero sí con el corazón fusionado", delay: 6500 },
-            { text: "Llegamos a ser uno mismo", delay: 7500 },
-            { text: "siempre y todos los días", delay: 8500 },
-            { spacer: true, delay: 9000 },
-            { text: "Vivimos en la incertidumbre", delay: 9500 },
-            { text: "del ¿Cuánto me quiere?", delay: 10500 },
-            { text: "pero contigo no existe", delay: 11500 },
-            { text: "porque me lo demuestras diariamente.", delay: 12500 },
-            { spacer: true, delay: 13000 },
-            { text: "Permíteme seguir estando", delay: 13500 },
-            { text: "Permíteme seguir hablando", delay: 14500 },
-            { text: "pero también seguir escuchando.", delay: 15500 }
-        ];
+        const PenIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+            </svg>
+        );
 
-        // Nuevo poema para el regalo 23 (cada línea es un verso)
-        const poemLinesRegalo = [
-            "Siento que no estoy para ti, que mereces más",
-            "Creo que tu amor va muy lejos, aquí y allá",
-            "Tus abrazos cálidos y que dan mucha paz",
-            "Reconfortantes como el rojo de tu cabellera",
-            "Quemándome como un millón de soles",
-            "Tratando de mantenerse un poco estables",
-            "Colapsando para dar paso a una vida nueva",
-            "Una aventura sin nubes grises que lluevan",
-            "Porque no importa cuantas lagrimas caigan",
-            "Son gotas mojadas que a ti nunca te apagan",
-            "Tremenda dualidad que tienes en tu ser",
-            "Llevando el Mar en tu nombre primero",
-            "Pero en el corazón un fuego eterno",
-            "Que luchan por un espacio y permanecer",
-            "Quedándose como yo en tus días",
-            "Incrustado en tus buenas memorias",
-            "En tus cumpleaños completos siempre",
-            "Y en los medios sin falta estar",
-            "Siendo un solo ser buscando ser libre",
-            "Y espero que eso no llegue a faltar",
-            "Te debo mi vida, al ser mi gran ancla",
-            "Te ofrezco mis palabras, mi pobre alma",
-            "Proporcionas algo, como tranquilidad",
-            "Porque tu siempre me dices la verdad",
-            "Sin importar el cómo pueda yo actuar",
-            "Cuando genuinamente volveré a estar",
-            "No pienso que me veas ausentar",
-            "Pero si llegara yo no más nunca cantar",
-            "Que no me puedas otra vez escuchar",
-            "Sepas que mi corazón en pausa teatral",
-            "Seguirá recordando tu suave y fino tocar",
-            "Esperando volver a sentir el vibrar",
-            "De tus dedos pasando sin algo afinar",
-            "Extrañando el sonido de tu risa",
-            "Pero deseando una reunión a prisa",
-            "Aun sin desear una reunión fatídica",
-            "Algo que se sienta como crítica",
-            "Si me voy no espero que me acompañes",
-            "Porque tu vives bien, aunque quizá llores",
-            "No quiero ser el ancla de tus olas",
-            "Más bien las nubes que acompañan",
-            "Las sales disueltas las cuales te bañan",
-            "No retenerte, para que nunca estés sola",
-            "Fumar tus ideas con mis labios partidos",
-            "Disfrutar la pureza de tus palabras",
-            "Deleitando la inmundicia de mis oídos",
-            "Entrando las ondas en las grietas",
-            "Propagando la belleza, dejando marca",
-            "Como una mordida roja, que sangra",
-            "Permanentemente tuya",
-            "Blanca como muñequita de porcelana."
-        ];
+        const UserIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+        );
 
-        // Componente del regalo 23 con el mismo formato que el poema principal
-        const Regalo23 = ({ onVolver }) => {
-            const [liked, setLiked] = useState(false);
-            const [showToast, setShowToast] = useState(false);
-            const [visibleLines, setVisibleLines] = useState(0);
+        const TrashIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+        );
 
-            useEffect(() => {
-                const timer = setInterval(() => {
-                    setVisibleLines(prev => (prev < poemLinesRegalo.length ? prev + 1 : prev));
-                }, 400);
-                return () => clearInterval(timer);
-            }, []);
+        const CloseIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
 
-            const handleShare = () => {
-                const fullPoem = poemLinesRegalo.join('\n');
-                if (navigator.share) {
-                    navigator.share({
-                        title: 'No. 23',
-                        text: fullPoem,
-                    }).catch(console.error);
-                } else {
-                    navigator.clipboard.writeText(fullPoem).then(() => {
-                        setShowToast(true);
-                        setTimeout(() => setShowToast(false), 3000);
-                    });
+        /* ==================================================================
+           FONDO DECORATIVO (reacciona al tema del poema actual)
+           ================================================================== */
+        const Backdrop = ({ themeKey }) => {
+            const t = THEMES[themeKey] || THEMES.rosa;
+            return (
+                <React.Fragment>
+                    <div className={`fixed inset-0 bg-gradient-to-br ${t.pageBg} transition-all duration-1000`}></div>
+                    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                        <div className={`absolute top-[-10%] left-[-10%] w-64 h-64 ${t.blobA} rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float transition-colors duration-1000`}></div>
+                        <div className={`absolute bottom-[-10%] right-[-10%] w-64 h-64 ${t.blobB} rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float transition-colors duration-1000`} style={{ animationDelay: "2s" }}></div>
+                    </div>
+                </React.Fragment>
+            );
+        };
+
+        /* ==================================================================
+           TARJETA DEL MENÚ (un poema)
+           ================================================================== */
+        const PoemCard = ({ poem, index, onOpen }) => {
+            const t = THEMES[poem.theme] || THEMES.rosa;
+            const preview = poem.lines.filter((l) => l.trim()).slice(0, 3);
+            return (
+                <div
+                    onClick={() => onOpen(poem.id)}
+                    className={`animate-fade-up group relative cursor-pointer overflow-hidden rounded-3xl bg-white/10 backdrop-blur-md shadow-2xl border ${t.border} transition-all duration-500 hover:scale-[1.03] hover:bg-white/15`}
+                    style={{ animationDelay: `${index * 90}ms` }}
+                >
+                    {/* Franja superior con el tema del poema */}
+                    <div className={`h-2 w-full bg-gradient-to-r ${t.chip}`}></div>
+
+                    {/* Cabecera */}
+                    <div className={`h-32 bg-gradient-to-b ${t.cardHeader} flex items-center justify-center relative`}>
+                        {poem.badge ? (
+                            <div className={`text-6xl font-bold ${t.accent} animate-pulse`}>{poem.badge}</div>
+                        ) : (
+                            <div className="transition-transform duration-700 group-hover:rotate-12">
+                                <FeatherIcon className={`${t.accent} opacity-80`} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Cuerpo */}
+                    <div className="px-6 pb-6 pt-2 text-center">
+                        <h2 className={`text-2xl ${t.titleFont} ${t.accent} mb-1`}>{poem.title}</h2>
+                        {poem.dedicatory && (
+                            <p className={`font-dancing italic text-sm ${t.caption} opacity-90 mb-3`}>{poem.dedicatory}</p>
+                        )}
+                        <div className="space-y-1 mb-4">
+                            {preview.map((line, i) => (
+                                <p key={i} className={`text-sm leading-snug ${i % 2 === 0 ? t.lineA : t.lineB} opacity-80`}>
+                                    {line}
+                                </p>
+                            ))}
+                            <p className={`text-sm ${t.lineB} opacity-40 italic`}>…</p>
+                        </div>
+                        <span className={`inline-block bg-gradient-to-r ${t.button} text-white text-sm font-medium px-5 py-2 rounded-full transition-transform duration-300 group-hover:scale-105`}>
+                            Leer poema
+                        </span>
+                        <p className="mt-3 text-xs text-white/40">— {poem.author}</p>
+                    </div>
+                </div>
+            );
+        };
+
+        /* ==================================================================
+           MODAL DE AUTENTICACIÓN
+           ================================================================== */
+        const AuthModal = ({ mode, onClose, onSwitchMode, onAuthed, showToast }) => {
+            const [email, setEmail] = useState("");
+            const [password, setPassword] = useState("");
+            const [busy, setBusy] = useState(false);
+            const [error, setError] = useState("");
+
+            const isLogin = mode === "login";
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError("");
+                if (!db) { showToast("Configura Supabase en index.html primero"); return; }
+                setBusy(true);
+                try {
+                    if (isLogin) {
+                        const { error } = await db.auth.signInWithPassword({ email, password });
+                        if (error) throw error;
+                        showToast("Bienvenida de vuelta ✨");
+                        onAuthed();
+                    } else {
+                        const { data, error } = await db.auth.signUp({ email, password });
+                        if (error) throw error;
+                        if (data.session) {
+                            showToast("Cuenta creada ✨");
+                            onAuthed();
+                        } else {
+                            showToast("Cuenta creada. Revisa tu correo para confirmarla.");
+                            onSwitchMode("login");
+                        }
+                    }
+                } catch (err) {
+                    setError(err.message || "Algo salió mal");
+                } finally {
+                    setBusy(false);
                 }
             };
 
-            // Agrupar versos en pares para las dos columnas
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+                    <div
+                        className="w-full max-w-sm bg-slate-900/90 border border-white/10 rounded-3xl shadow-2xl p-8 animate-fade-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-2xl font-dancing text-pink-300">
+                                {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+                            </h3>
+                            <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
+                                <CloseIcon />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input
+                                type="email"
+                                required
+                                placeholder="Tu correo"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-white/10 rounded-xl px-4 py-3 placeholder-white/40 outline-none focus:ring-2 focus:ring-pink-400 transition"
+                            />
+                            <input
+                                type="password"
+                                required
+                                minLength={6}
+                                placeholder="Contraseña (mínimo 6 caracteres)"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full bg-white/10 rounded-xl px-4 py-3 placeholder-white/40 outline-none focus:ring-2 focus:ring-pink-400 transition"
+                            />
+
+                            {error && <p className="text-rose-300 text-sm">{error}</p>}
+
+                            <button
+                                type="submit"
+                                disabled={busy}
+                                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                {busy ? "Un momento…" : isLogin ? "Entrar" : "Crear cuenta"}
+                            </button>
+                        </form>
+
+                        <p className="mt-5 text-center text-sm text-white/50">
+                            {isLogin ? "¿Aún no tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
+                            <button
+                                onClick={() => { setError(""); onSwitchMode(isLogin ? "signup" : "login"); }}
+                                className="text-pink-300 hover:text-pink-200 underline underline-offset-2"
+                            >
+                                {isLogin ? "Crear cuenta" : "Iniciar sesión"}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            );
+        };
+
+        /* ==================================================================
+           VISTA LECTOR (un poema, con animación verso a verso)
+           ================================================================== */
+        const Reader = ({ poem, session, liked, onToggleLike, onBack, onDelete, showToast }) => {
+            const [visibleLines, setVisibleLines] = useState(0);
+            const t = THEMES[poem.theme] || THEMES.rosa;
+
+            useEffect(() => {
+                setVisibleLines(0);
+                const speed = poem.lines.length > 25 ? 400 : 800;
+                const timer = setInterval(() => {
+                    setVisibleLines((prev) => (prev < poem.lines.length ? prev + 1 : prev));
+                }, speed);
+                return () => clearInterval(timer);
+            }, [poem.id]);
+
+            const handleShare = () => {
+                const fullPoem = `${poem.title}\n\n${poem.lines.filter((l) => l.trim()).join("\n")}`;
+                if (navigator.share) {
+                    navigator.share({ title: poem.title, text: fullPoem }).catch(() => {});
+                } else {
+                    navigator.clipboard.writeText(fullPoem).then(() => showToast("Poema copiado ✨"));
+                }
+            };
+
+            const canDelete = db && session && poem.userId && session.id === poem.userId;
+
+            // Pares de versos para poemas a dos columnas
             const rows = [];
-            for (let i = 0; i < poemLinesRegalo.length; i += 2) {
-                rows.push({
-                    left: { text: poemLinesRegalo[i], index: i },
-                    right: i + 1 < poemLinesRegalo.length ? { text: poemLinesRegalo[i + 1], index: i + 1 } : null
-                });
+            if (poem.twoCol) {
+                for (let i = 0; i < poem.lines.length; i += 2) {
+                    rows.push({
+                        left: { text: poem.lines[i], index: i },
+                        right: i + 1 < poem.lines.length ? { text: poem.lines[i + 1], index: i + 1 } : null,
+                    });
+                }
             }
 
             return (
-                <div className="relative z-10 max-w-4xl w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
-                    {/* Cabecera */}
-                    <div className="h-48 bg-gradient-to-b from-pink-500/20 to-transparent flex items-center justify-center flex-col relative group">
-                        <div className="text-7xl font-bold text-pink-300 animate-pulse">23</div>
-                        <div className="mt-2 text-xs text-pink-200 uppercase tracking-[0.2em] opacity-80 font-bold">
-                            ¿Dónde se supone que estás?
-                        </div>
+                <div className="relative z-10 w-full max-w-4xl bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
+                    {/* Volver */}
+                    <button
+                        onClick={onBack}
+                        className="absolute top-4 left-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
+                        title="Volver al menú"
+                    >
+                        <BackIcon className="text-white" />
+                    </button>
+
+                    {/* Cabecera con título y dedicatoria */}
+                    <div className={`h-44 bg-gradient-to-b ${t.cardHeader} flex items-center justify-center flex-col relative px-14`}>
+                        {poem.badge ? (
+                            <div className={`text-7xl font-bold ${t.accent} animate-pulse`}>{poem.badge}</div>
+                        ) : (
+                            <div className="animate-float">
+                                <FeatherIcon className={`${t.accent} opacity-80`} />
+                            </div>
+                        )}
+                        <h1 className={`mt-3 text-4xl ${t.titleFont} ${t.accent}`}>{poem.title}</h1>
+                        {poem.dedicatory && (
+                            <div className={`mt-2 font-dancing italic text-sm md:text-base ${t.caption} uppercase tracking-[0.2em] opacity-90 text-center`}>
+                                {poem.dedicatory}
+                            </div>
+                        )}
+                        <div className="mt-1 text-xs text-white/50">— {poem.author}</div>
                     </div>
 
-                    {/* Contenido del poema en dos columnas */}
-                    <div className="px-4 md:px-8 pb-8 pt-2 min-h-[400px] flex flex-col items-center text-center">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 w-full">
-                            {rows.map((row, rowIndex) => {
-                                const isLastRow = rowIndex === rows.length - 1;
-                                return (
-                                    <React.Fragment key={rowIndex}>
-                                        {/* Columna izquierda */}
-                                        <p 
-                                            className={`font-dancing text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform 
-                                                ${row.left.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
-                                                ${row.left.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}
-                                                ${isLastRow && !row.right ? 'md:col-span-2 text-center' : 'text-left md:text-right'}`}
-                                        >
-                                            {row.left.text}
-                                        </p>
-                                        {/* Columna derecha, si existe */}
-                                        {row.right && (
-                                            <p 
-                                                className={`font-dancing text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform text-left
-                                                    ${row.right.index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'}
-                                                    ${row.right.index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
+                    {/* Contenido */}
+                    <div className="px-4 md:px-8 pb-8 pt-4 min-h-[300px] flex flex-col items-center text-center">
+                        {poem.twoCol ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 w-full">
+                                {rows.map((row, rowIndex) => {
+                                    const isLastRow = rowIndex === rows.length - 1;
+                                    return (
+                                        <React.Fragment key={rowIndex}>
+                                            <p
+                                                className={`text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform
+                                                    ${row.left.index < visibleLines ? "opacity-100 translate-y-0 blur-0" : "opacity-0 translate-y-8 blur-sm"}
+                                                    ${row.left.index % 2 === 0 ? t.lineA : t.lineB}
+                                                    ${isLastRow && !row.right ? "md:col-span-2 text-center" : "text-left md:text-right"}`}
                                             >
-                                                {row.right.text}
+                                                {row.left.text}
                                             </p>
-                                        )}
-                                    </React.Fragment>
+                                            {row.right && (
+                                                <p
+                                                    className={`text-base md:text-lg leading-relaxed transition-all duration-1000 ease-out transform text-left
+                                                        ${row.right.index < visibleLines ? "opacity-100 translate-y-0 blur-0" : "opacity-0 translate-y-8 blur-sm"}
+                                                        ${row.right.index % 2 === 0 ? t.lineA : t.lineB}`}
+                                                >
+                                                    {row.right.text}
+                                                </p>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            poem.lines.map((line, index) => {
+                                if (!line.trim()) return <div key={index} className="h-6 w-full"></div>;
+                                return (
+                                    <p
+                                        key={index}
+                                        className={`text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
+                                            ${index < visibleLines ? "opacity-100 translate-y-0 blur-0" : "opacity-0 translate-y-8 blur-sm"}
+                                            ${index % 2 === 0 ? t.lineA : t.lineB}`}
+                                    >
+                                        {line}
+                                    </p>
                                 );
-                            })}
-                        </div>
+                            })
+                        )}
                     </div>
 
-                    {/* Pie de página con acciones y botón de volver */}
+                    {/* Acciones */}
                     <div className="bg-black/20 p-4 flex flex-col md:flex-row justify-between items-center gap-4 backdrop-blur-lg border-t border-white/5">
                         <div className="flex gap-2">
-                            <button 
-                                onClick={() => setLiked(!liked)}
+                            <button
+                                onClick={onToggleLike}
                                 className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95 group"
                             >
-                                <div className={`transition-transform duration-300 ${liked ? 'scale-125' : 'group-hover:scale-110'}`}>
-                                    <HeartIcon filled={liked} className={liked ? 'text-red-500' : 'text-white'} />
+                                <div className={`transition-transform duration-300 ${liked ? "scale-125" : "group-hover:scale-110"}`}>
+                                    <HeartIcon filled={liked} className={liked ? "text-red-500 animate-pop-heart" : "text-white"} />
                                 </div>
-                                <span className={`text-sm font-medium transition-colors ${liked ? 'text-red-200' : 'text-white'}`}>
-                                    {liked ? 'Lo siento' : 'Love'}
+                                <span className={`text-sm font-medium transition-colors ${liked ? "text-red-200" : "text-white"}`}>
+                                    {liked ? "Lo siento" : "Love"}
                                 </span>
                             </button>
 
-                            <button 
+                            <button
                                 onClick={handleShare}
                                 className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95"
                             >
                                 <ShareIcon className="text-white" />
                                 <span className="text-sm font-medium text-white">Compartir</span>
                             </button>
+
+                            {canDelete && (
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("¿Borrar este poema para siempre?")) onDelete();
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-rose-500/20 text-rose-300 transition-all active:scale-95"
+                                >
+                                    <TrashIcon className="text-rose-300" />
+                                    <span className="text-sm font-medium">Borrar</span>
+                                </button>
+                            )}
                         </div>
 
-                        <button 
-                            onClick={onVolver}
+                        <button
+                            onClick={onBack}
                             className="flex items-center gap-2 px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
                         >
                             <BackIcon className="text-white" />
                             <span className="text-sm font-medium text-white">Volver al Inicio</span>
                         </button>
                     </div>
-
-                    {/* Toast para copiado */}
-                    <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-50
-                        ${showToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'}`}>
-                        ✨ Poema del regalo copiado
-                    </div>
                 </div>
             );
         };
 
-        const App = () => {
-            const [liked, setLiked] = useState(false);
-            const [showToast, setShowToast] = useState(false);
-            const [visibleLines, setVisibleLines] = useState(0);
-            const [mostrarRegalo, setMostrarRegalo] = useState(false);
+        /* ==================================================================
+           VISTA PUBLICAR
+           ================================================================== */
+        const PublishView = ({ session, onBack, onPublished, showToast }) => {
+            const [title, setTitle] = useState("");
+            const [dedicatory, setDedicatory] = useState("");
+            const [author, setAuthor] = useState(session && session.email ? session.email.split("@")[0] : "");
+            const [theme, setTheme] = useState("rosa");
+            const [body, setBody] = useState("");
+            const [badge, setBadge] = useState("");
+            const [busy, setBusy] = useState(false);
+            const [error, setError] = useState("");
 
-            useEffect(() => {
-                const timer = setInterval(() => {
-                    setVisibleLines(prev => (prev < poemLinesOriginal.length ? prev + 1 : prev));
-                }, 800);
-                return () => clearInterval(timer);
-            }, []);
+            const t = THEMES[theme];
+            const previewLines = body.split("\n").filter((l) => l.trim()).slice(0, 5);
 
-            const handleShare = () => {
-                const fullPoem = poemLinesOriginal
-                    .filter(line => !line.spacer)
-                    .map(line => line.text)
-                    .join('\n');
-                
-                if (navigator.share) {
-                    navigator.share({
-                        title: 'Para ti',
-                        text: fullPoem,
-                    }).catch(console.error);
-                } else {
-                    navigator.clipboard.writeText(fullPoem).then(() => {
-                        setShowToast(true);
-                        setTimeout(() => setShowToast(false), 3000);
-                    });
+            const handlePublish = async (e) => {
+                e.preventDefault();
+                setError("");
+                const lines = body.split("\n").map((l) => l.trim());
+                if (!title.trim()) { setError("El poema necesita un título"); return; }
+                if (!lines.filter((l) => l).length) { setError("Escribe al menos un verso"); return; }
+                setBusy(true);
+                try {
+                    const { data, error } = await db
+                        .from("poems")
+                        .insert({
+                            title: title.trim(),
+                            dedicatory: dedicatory.trim() || null,
+                            author: author.trim() || "Anónimo",
+                            theme,
+                            lines,
+                            badge: badge.trim() || null,
+                            columns: false,
+                            user_id: session.id,
+                        })
+                        .select()
+                        .single();
+                    if (error) throw error;
+                    showToast("Poema publicado ✨");
+                    onPublished(rowToPoem(data));
+                } catch (err) {
+                    setError(err.message || "No se pudo publicar");
+                } finally {
+                    setBusy(false);
                 }
             };
 
+            const inputClass = "w-full bg-white/10 rounded-xl px-4 py-3 placeholder-white/40 outline-none focus:ring-2 focus:ring-pink-400 transition";
+
             return (
-                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 relative">
-                    
-                    {/* Decoración de fondo */}
-                    <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                        <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-pink-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float"></div>
-                        <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-float" style={{animationDelay: '2s'}}></div>
-                    </div>
+                <div className="relative z-10 w-full max-w-5xl flex flex-col items-center">
+                    <button
+                        onClick={onBack}
+                        className="self-start mb-4 flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
+                    >
+                        <BackIcon className="text-white w-5 h-5" />
+                        <span className="text-sm font-medium text-white">Volver al menú</span>
+                    </button>
 
-                    {/* Botón flotante lateral derecho (solo visible en el poema) */}
-                    {!mostrarRegalo && (
-                        <button
-                            onClick={() => setMostrarRegalo(true)}
-                            className="fixed right-4 top-1/2 -translate-y-1/2 z-20 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-3 rounded-l-2xl rounded-r-full shadow-2xl flex items-center gap-2 hover:from-pink-600 hover:to-purple-700 transition-all transform hover:scale-105 animate-pulse-glow border border-white/20"
-                            style={{ writingMode: 'horizontal-tb' }}
-                        >
-                            <GiftIcon className="w-5 h-5" />
-                            <span className="font-medium text-sm md:text-base whitespace-nowrap">Abre tu regalo No. 23</span>
-                            <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-pink-300 rounded-full animate-ping"></div>
-                        </button>
-                    )}
+                    <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                        {/* Formulario */}
+                        <form onSubmit={handlePublish} className="bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 p-6 md:p-8 space-y-4">
+                            <h2 className="text-3xl font-dancing text-pink-300 mb-2">Publicar un poema</h2>
 
-                    {/* Contenido condicional */}
-                    {mostrarRegalo ? (
-                        <Regalo23 onVolver={() => setMostrarRegalo(false)} />
-                    ) : (
-                        /* Tarjeta Principal del Poema */
-                        <div className="relative z-10 max-w-md w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden transition-all duration-500">
-                            
-                            {/* Cabecera */}
-                            <div className="h-48 bg-gradient-to-b from-pink-500/20 to-transparent flex items-center justify-center flex-col relative group">
-                                <div className="transform transition-transform duration-700 group-hover:rotate-12">
-                                    <FeatherIcon />
-                                </div>
-                                <div className="mt-4 text-xs text-pink-200 uppercase tracking-[0.2em] opacity-80 font-bold">
-                                    Mar Mar Mar, siempre eres tu Mar.
-                                </div>
+                            <input
+                                type="text"
+                                placeholder="Título del poema"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                className={inputClass}
+                                maxLength={80}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Dedicatoria (opcional)"
+                                value={dedicatory}
+                                onChange={(e) => setDedicatory(e.target.value)}
+                                className={inputClass}
+                                maxLength={120}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input
+                                    type="text"
+                                    placeholder="Tu nombre"
+                                    value={author}
+                                    onChange={(e) => setAuthor(e.target.value)}
+                                    className={inputClass}
+                                    maxLength={60}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Número o símbolo (opcional)"
+                                    value={badge}
+                                    onChange={(e) => setBadge(e.target.value)}
+                                    className={inputClass}
+                                    maxLength={4}
+                                />
                             </div>
 
-                            {/* Contenido del Poema */}
-                            <div className="px-8 pb-8 pt-2 min-h-[400px] flex flex-col justify-center items-center text-center">
-                                {poemLinesOriginal.map((line, index) => {
-                                    if (line.spacer) return <div key={index} className="h-6 w-full"></div>;
-                                    
-                                    return (
-                                        <p 
-                                            key={index}
-                                            className={`font-dancing text-lg md:text-xl leading-relaxed transition-all duration-1000 ease-out transform w-full
-                                                ${index < visibleLines ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-8 blur-sm'} 
-                                                ${index % 2 === 0 ? 'text-pink-50' : 'text-purple-100'}`}
+                            <div>
+                                <p className="text-sm text-white/60 mb-2">Tema visual</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {THEME_KEYS.map((key) => (
+                                        <button
+                                            type="button"
+                                            key={key}
+                                            onClick={() => setTheme(key)}
+                                            className={`bg-gradient-to-r ${THEMES[key].chip} px-4 py-2 rounded-full text-sm font-medium transition-all
+                                                ${theme === key ? "ring-2 ring-white scale-105" : "opacity-60 hover:opacity-100"}`}
                                         >
-                                            {line.text}
-                                        </p>
-                                    );
-                                })}
+                                            {THEMES[key].name}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* Pie de página / Acciones */}
-                            <div className="bg-black/20 p-4 flex justify-between items-center backdrop-blur-lg border-t border-white/5">
-                                <button 
-                                    onClick={() => setLiked(!liked)}
-                                    className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95 group"
-                                >
-                                    <div className={`transition-transform duration-300 ${liked ? 'scale-125' : 'group-hover:scale-110'}`}>
-                                        <HeartIcon filled={liked} className={liked ? 'text-red-500' : 'text-white'} />
-                                    </div>
-                                    <span className={`text-sm font-medium transition-colors ${liked ? 'text-red-200' : 'text-white'}`}>
-                                        {liked ? 'Lo siento' : 'Love'}
-                                    </span>
-                                </button>
+                            <textarea
+                                placeholder={"Escribe tu poema aquí…\nUna línea por verso."}
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                rows={10}
+                                className={`${inputClass} resize-y`}
+                            />
 
-                                <button 
-                                    onClick={handleShare}
-                                    className="flex items-center gap-2 px-6 py-2 rounded-full hover:bg-white/10 transition-all active:scale-95"
-                                >
-                                    <ShareIcon className="text-white" />
-                                    <span className="text-sm font-medium text-white">Compartir</span>
-                                </button>
+                            {error && <p className="text-rose-300 text-sm">{error}</p>}
+
+                            <button
+                                type="submit"
+                                disabled={busy}
+                                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 rounded-xl font-medium hover:from-pink-600 hover:to-purple-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                <PenIcon className="w-5 h-5" />
+                                {busy ? "Publicando…" : "Publicar poema"}
+                            </button>
+                        </form>
+
+                        {/* Vista previa en vivo */}
+                        <div className={`lg:sticky lg:top-6 rounded-3xl overflow-hidden shadow-2xl border ${t.border} bg-white/10 backdrop-blur-md`}>
+                            <div className={`h-2 w-full bg-gradient-to-r ${t.chip}`}></div>
+                            <div className={`h-28 bg-gradient-to-b ${t.cardHeader} flex items-center justify-center flex-col px-4`}>
+                                {badge.trim() ? (
+                                    <div className={`text-5xl font-bold ${t.accent}`}>{badge}</div>
+                                ) : (
+                                    <FeatherIcon className={`${t.accent} opacity-80 w-12 h-12`} />
+                                )}
+                                <h3 className={`mt-2 text-2xl ${t.titleFont} ${t.accent}`}>{title || "Tu título aquí"}</h3>
+                                {dedicatory && <p className={`font-dancing italic text-xs ${t.caption}`}>{dedicatory}</p>}
+                            </div>
+                            <div className="px-6 py-5 text-center space-y-1 min-h-[180px]">
+                                {previewLines.length ? (
+                                    previewLines.map((line, i) => (
+                                        <p key={i} className={`${t.bodyFont} text-lg ${i % 2 === 0 ? t.lineA : t.lineB} opacity-90`}>
+                                            {line}
+                                        </p>
+                                    ))
+                                ) : (
+                                    <p className={`${t.bodyFont} text-lg ${t.lineB} opacity-40`}>La vista previa de tu poema aparecerá aquí…</p>
+                                )}
+                            </div>
+                            <div className="bg-black/20 px-6 py-3 text-center text-xs text-white/50 border-t border-white/5">
+                                — {author || "Anónimo"} · Tema: {t.name}
                             </div>
                         </div>
-                    )}
-
-                    {/* Notificación Toast para el poema principal */}
-                    <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-50
-                        ${showToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'}`}>
-                        ✨ Poema copiado
-                    </div>
-
-                    <div className="mt-8 text-white/20 text-xs text-center font-light">
-                        Hecho con el corazón
                     </div>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        /* ==================================================================
+           APP PRINCIPAL
+           ================================================================== */
+        const App = () => {
+            const [view, setView] = useState("menu"); // 'menu' | 'reader' | 'publish'
+            const [poemId, setPoemId] = useState(null);
+            const [poems, setPoems] = useState(() => (db ? [] : POEM_SEED));
+            const [loading, setLoading] = useState(!!db);
+            const [session, setSession] = useState(null);
+            const [authModal, setAuthModal] = useState(null); // null | 'login' | 'signup'
+            const [toast, setToast] = useState(null);
+            const [likes, setLikes] = useState(() => {
+                try { return JSON.parse(localStorage.getItem("poem_likes") || "{}"); }
+                catch (e) { return {}; }
+            });
+
+            const showToast = (msg) => setToast({ msg, id: Date.now() });
+
+            useEffect(() => {
+                if (!toast) return;
+                const t = setTimeout(() => setToast(null), 2600);
+                return () => clearTimeout(t);
+            }, [toast]);
+
+            // Sesión + poemas desde la base de datos (con siembra automática)
+            useEffect(() => {
+                if (!db) return;
+                let alive = true;
+                (async () => {
+                    try {
+                        const { data } = await db.auth.getSession();
+                        if (alive) setSession(data.session ? data.session.user : null);
+                        db.auth.onAuthStateChange((_event, s) => {
+                            if (alive) setSession(s ? s.user : null);
+                        });
+
+                        let { data: rows, error } = await db
+                            .from("poems")
+                            .select("*")
+                            .order("created_at", { ascending: true });
+                        if (error) throw error;
+
+                        // Primera conexión: sembrar los poemas originales
+                        if (!rows || rows.length === 0) {
+                            const { data: created, error: insErr } = await db
+                                .from("poems")
+                                .insert(
+                                    POEM_SEED.map((p) => ({
+                                        title: p.title,
+                                        dedicatory: p.dedicatory,
+                                        author: p.author,
+                                        theme: p.theme,
+                                        lines: p.lines,
+                                        badge: p.badge,
+                                        columns: p.twoCol,
+                                    }))
+                                )
+                                .select();
+                            if (insErr) console.error("Error sembrando poemas:", insErr);
+                            rows = created || [];
+                        }
+
+                        if (alive) {
+                            setPoems(rows.map(rowToPoem));
+                            setLoading(false);
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        if (alive) {
+                            setPoems(POEM_SEED);
+                            setLoading(false);
+                            showToast("No se pudo conectar con la base de datos");
+                        }
+                    }
+                })();
+                return () => { alive = false; };
+            }, []);
+
+            const toggleLike = (id) => {
+                setLikes((prev) => {
+                    const next = { ...prev, [id]: !prev[id] };
+                    localStorage.setItem("poem_likes", JSON.stringify(next));
+                    return next;
+                });
+            };
+
+            const currentPoem = poems.find((p) => p.id === poemId);
+            const themeKey = view === "reader" && currentPoem ? currentPoem.theme : "rosa";
+
+            const requireDb = () => {
+                if (!db) { showToast("Configura Supabase en index.html para usar cuentas"); return false; }
+                return true;
+            };
+
+            const handleDeletePoem = async () => {
+                if (!currentPoem) return;
+                const { error } = await db.from("poems").delete().eq("id", currentPoem.id);
+                if (error) { showToast("No se pudo borrar"); return; }
+                setPoems((prev) => prev.filter((p) => p.id !== currentPoem.id));
+                setView("menu");
+                showToast("Poema borrado");
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col items-center p-4 md:p-8">
+                    <Backdrop themeKey={themeKey} />
+
+                    {/* Aviso de modo local */}
+                    {!db && view === "menu" && (
+                        <div className="relative z-10 w-full max-w-4xl mb-4 text-center text-xs md:text-sm bg-amber-500/15 border border-amber-300/30 text-amber-200 rounded-2xl px-4 py-2">
+                            Modo local: añade tus claves de Supabase en <b>index.html</b> (y ejecuta <b>supabase-setup.sql</b>) para activar el login y publicar poemas.
+                        </div>
+                    )}
+
+                    {/* Barra superior */}
+                    <header className="relative z-10 w-full max-w-5xl flex flex-col md:flex-row justify-between items-center gap-3 mb-8">
+                        <button
+                            onClick={() => setView("menu")}
+                            className="flex items-center gap-3 group"
+                        >
+                            <FeatherIcon className="text-pink-300 opacity-80 w-8 h-8 transition-transform duration-700 group-hover:rotate-12" />
+                            <div className="text-left">
+                                <div className="text-xl font-dancing text-white/90 leading-none">Tu Existencia</div>
+                                <div className="text-[10px] uppercase tracking-[0.25em] text-pink-200/60">Colección de poemas</div>
+                            </div>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    if (!requireDb()) return;
+                                    if (session) setView("publish");
+                                    else setAuthModal("login");
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 font-medium text-sm shadow-lg hover:from-pink-600 hover:to-purple-700 transition-all active:scale-95"
+                            >
+                                <PenIcon className="w-4 h-4" />
+                                Publicar poema
+                            </button>
+
+                            {session ? (
+                                <div className="flex items-center gap-2 bg-white/10 rounded-full pl-3 pr-1 py-1">
+                                    <UserIcon className="text-pink-200" />
+                                    <span className="text-xs text-white/80 max-w-[120px] truncate">{session.email}</span>
+                                    <button
+                                        onClick={async () => { await db.auth.signOut(); showToast("Sesión cerrada"); }}
+                                        className="text-xs bg-white/10 hover:bg-white/20 rounded-full px-3 py-1 transition-colors"
+                                    >
+                                        Salir
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => { if (!requireDb()) return; setAuthModal("login"); }}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 font-medium text-sm transition-all active:scale-95"
+                                >
+                                    <UserIcon />
+                                    Iniciar sesión
+                                </button>
+                            )}
+                        </div>
+                    </header>
+
+                    {/* Contenido por vista */}
+                    {view === "menu" && (
+                        <main className="relative z-10 w-full max-w-5xl">
+                            {loading ? (
+                                <div className="flex justify-center py-20">
+                                    <div className="animate-float text-center">
+                                        <FeatherIcon className="text-pink-300 opacity-70 mx-auto" />
+                                        <p className="mt-4 text-white/50 font-dancing text-xl">Abriendo el libro de poemas…</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {poems.map((poem, i) => (
+                                        <PoemCard
+                                            key={poem.id}
+                                            poem={poem}
+                                            index={i}
+                                            onOpen={(id) => { setPoemId(id); setView("reader"); }}
+                                        />
+                                    ))}
+                                    {!db && (
+                                        <div className="animate-fade-up rounded-3xl border border-dashed border-white/20 flex flex-col items-center justify-center p-8 text-center text-white/40" style={{ animationDelay: `${poems.length * 90}ms` }}>
+                                            <PenIcon className="w-8 h-8 mb-3" />
+                                            <p className="text-sm">Conecta Supabase para publicar los tuyos</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </main>
+                    )}
+
+                    {view === "reader" && currentPoem && (
+                        <main className="relative z-10 w-full flex justify-center">
+                            <Reader
+                                poem={currentPoem}
+                                session={session}
+                                liked={!!likes[currentPoem.id]}
+                                onToggleLike={() => toggleLike(currentPoem.id)}
+                                onBack={() => setView("menu")}
+                                onDelete={handleDeletePoem}
+                                showToast={showToast}
+                            />
+                        </main>
+                    )}
+
+                    {view === "publish" && (
+                        <main className="relative z-10 w-full flex justify-center">
+                            {session ? (
+                                <PublishView
+                                    session={session}
+                                    onBack={() => setView("menu")}
+                                    showToast={showToast}
+                                    onPublished={(poem) => {
+                                        setPoems((prev) => [...prev, poem]);
+                                        setPoemId(poem.id);
+                                        setView("reader");
+                                    }}
+                                />
+                            ) : (
+                                <div className="text-center bg-white/10 backdrop-blur-md rounded-3xl border border-white/10 p-10 max-w-sm">
+                                    <UserIcon className="mx-auto text-pink-300 w-10 h-10 mb-4" />
+                                    <p className="font-dancing text-2xl text-pink-200 mb-2">Inicia sesión para publicar</p>
+                                    <p className="text-sm text-white/60 mb-6">Así cada poema guarda su autor y puedes borrar los tuyos.</p>
+                                    <button
+                                        onClick={() => setAuthModal("login")}
+                                        className="bg-gradient-to-r from-pink-500 to-purple-600 px-8 py-3 rounded-full font-medium hover:from-pink-600 hover:to-purple-700 transition-all active:scale-95"
+                                    >
+                                        Iniciar sesión
+                                    </button>
+                                </div>
+                            )}
+                        </main>
+                    )}
+
+                    {/* Pie */}
+                    <div className="relative z-10 mt-10 mb-4 text-white/20 text-xs text-center font-light">
+                        Hecho con el corazón
+                    </div>
+
+                    {/* Modal de autenticación */}
+                    {authModal && (
+                        <AuthModal
+                            mode={authModal}
+                            onClose={() => setAuthModal(null)}
+                            onSwitchMode={setAuthModal}
+                            onAuthed={() => setAuthModal(null)}
+                            showToast={showToast}
+                        />
+                    )}
+
+                    {/* Toast */}
+                    <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-purple-900 px-6 py-3 rounded-full shadow-2xl font-medium transform transition-all duration-500 z-[60]
+                        ${toast ? "translate-y-0 opacity-100 scale-100" : "translate-y-20 opacity-0 scale-95"}`}>
+                        {toast ? toast.msg : ""}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
         root.render(<App />);
     </script>
 </body>
