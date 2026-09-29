@@ -1,0 +1,13 @@
+# Freebuff internal metadata
+.freebuff/
+
+# Copias de seguridad del generador de poemas.xlsx
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+Thumbs.db
+.DS_Store
