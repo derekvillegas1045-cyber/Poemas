@@ -13,6 +13,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Supabase (base de datos + autenticación) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS (lectura de poemas.xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <!-- Fuentes elegantes -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400&display=swap" rel="stylesheet">
@@ -64,7 +66,7 @@
               - Project URL
               - anon public key
            Mientras estén los placeholders, la página funciona en "modo
-           local" con los poemas incluidos, sin login ni publicaciones.
+           local": los poemas salen de poemas.xlsx, sin login ni publicar.
            ================================================================== */
         const SUPABASE_URL = "PON_AQUI_TU_SUPABASE_URL";
         const SUPABASE_ANON_KEY = "PON_AQUI_TU_SUPABASE_ANON_KEY";
@@ -170,104 +172,72 @@
         const THEME_KEYS = Object.keys(THEMES);
 
         /* ==================================================================
-           POEMAS SEMILLA
-           Se publican automáticamente a la base de datos la primera vez
-           que la página se conecta a Supabase con la tabla vacía.
+           POEMAS DESDE EXCEL (poemas.xlsx)
+           El .xlsx es la fuente de verdad de la colección:
+             Hoja "Poemas": id, title, dedicatory, author, theme, badge, columns
+             Hoja "Versos": poem_id, line_no, text
+           Edítalo en Excel, Google Sheets o LibreOffice y recarga la página.
+           Puedes regenerarlo con: python tools/generate_poemas.py
            ================================================================== */
-        const POEM_SEED = [
-            {
-                title: "Tu Existencia",
-                dedicatory: "Mar Mar Mar, siempre eres tu Mar.",
-                author: "Anónimo",
-                theme: "rosa",
-                badge: null,
-                twoCol: false,
-                lines: [
-                    "Tu existencia es un regalo",
-                    "Tus palabras una oda a la belleza",
-                    "Quiero abrazarte hasta que muera",
-                    "Y eliminar todo lo que es malo",
-                    "",
-                    "Estaré para ti",
-                    "quizá no con las manos cocidas",
-                    "Pero sí con el corazón fusionado",
-                    "Llegamos a ser uno mismo",
-                    "siempre y todos los días",
-                    "",
-                    "Vivimos en la incertidumbre",
-                    "del ¿Cuánto me quiere?",
-                    "pero contigo no existe",
-                    "porque me lo demuestras diariamente.",
-                    "",
-                    "Permíteme seguir estando",
-                    "Permíteme seguir hablando",
-                    "pero también seguir escuchando.",
-                ],
-            },
-            {
-                title: "Regalo No. 23",
-                dedicatory: "¿Dónde se supone que estás?",
-                author: "Anónimo",
-                theme: "rosa",
-                badge: "23",
-                twoCol: true,
-                lines: [
-                    "Siento que no estoy para ti, que mereces más",
-                    "Creo que tu amor va muy lejos, aquí y allá",
-                    "Tus abrazos cálidos y que dan mucha paz",
-                    "Reconfortantes como el rojo de tu cabellera",
-                    "Quemándome como un millón de soles",
-                    "Tratando de mantenerse un poco estables",
-                    "Colapsando para dar paso a una vida nueva",
-                    "Una aventura sin nubes grises que lluevan",
-                    "Porque no importa cuantas lagrimas caigan",
-                    "Son gotas mojadas que a ti nunca te apagan",
-                    "Tremenda dualidad que tienes en tu ser",
-                    "Llevando el Mar en tu nombre primero",
-                    "Pero en el corazón un fuego eterno",
-                    "Que luchan por un espacio y permanecer",
-                    "Quedándose como yo en tus días",
-                    "Incrustado en tus buenas memorias",
-                    "En tus cumpleaños completos siempre",
-                    "Y en los medios sin falta estar",
-                    "Siendo un solo ser buscando ser libre",
-                    "Y espero que eso no llegue a faltar",
-                    "Te debo mi vida, al ser mi gran ancla",
-                    "Te ofrezco mis palabras, mi pobre alma",
-                    "Proporcionas algo, como tranquilidad",
-                    "Porque tu siempre me dices la verdad",
-                    "Sin importar el cómo pueda yo actuar",
-                    "Cuando genuinamente volveré a estar",
-                    "No pienso que me veas ausentar",
-                    "Pero si llegara yo no más nunca cantar",
-                    "Que no me puedas otra vez escuchar",
-                    "Sepas que mi corazón en pausa teatral",
-                    "Seguirá recordando tu suave y fino tocar",
-                    "Esperando volver a sentir el vibrar",
-                    "De tus dedos pasando sin algo afinar",
-                    "Extrañando el sonido de tu risa",
-                    "Pero deseando una reunión a prisa",
-                    "Aun sin desear una reunión fatídica",
-                    "Algo que se sienta como crítica",
-                    "Si me voy no espero que me acompañes",
-                    "Porque tu vives bien, aunque quizá llores",
-                    "No quiero ser el ancla de tus olas",
-                    "Más bien las nubes que acompañan",
-                    "Las sales disueltas las cuales te bañan",
-                    "No retenerte, para que nunca estés sola",
-                    "Fumar tus ideas con mis labios partidos",
-                    "Disfrutar la pureza de tus palabras",
-                    "Deleitando la inmundicia de mis oídos",
-                    "Entrando las ondas en las grietas",
-                    "Propagando la belleza, dejando marca",
-                    "Como una mordida roja, que sangra",
-                    "Permanentemente tuya",
-                    "Blanca como muñequita de porcelana.",
-                ],
-            },
-        ];
+        const XLSX_FILE = "poemas.xlsx";
+        const BOOL_TRUE = new Set(["sí", "si", "yes", "true", "1"]);
 
-        const rowToPoem = (r) => ({
+        const slugify = (text) =>
+            (String(text).toLowerCase().match(/[a-z0-9]+/g) || []).join("-") || "poema";
+
+        // Convierte un libro de Excel en la lista de objetos de poema
+        const poemsFromWorkbook = (workbook) => {
+            const poemSheet = workbook.Sheets["Poemas"];
+            const verseSheet = workbook.Sheets["Versos"];
+            if (!poemSheet) throw new Error('Falta la hoja "Poemas" en el Excel');
+
+            const poemRows = XLSX.utils.sheet_to_json(poemSheet, { defval: "" });
+            const verseRows = verseSheet ? XLSX.utils.sheet_to_json(verseSheet, { defval: "" }) : [];
+
+            // Agrupar versos por poem_id y ordenarlos por line_no
+            const linesByPoem = {};
+            verseRows.forEach((v) => {
+                const pid = String(v.poem_id || "").trim();
+                if (!pid) return;
+                if (!linesByPoem[pid]) linesByPoem[pid] = [];
+                linesByPoem[pid].push({
+                    n: parseInt(v.line_no, 10) || 0,
+                    text: v.text != null ? String(v.text) : "",
+                });
+            });
+            Object.keys(linesByPoem).forEach((pid) => {
+                linesByPoem[pid].sort((a, b) => a.n - b.n);
+                linesByPoem[pid] = linesByPoem[pid].map((l) => l.text);
+            });
+
+            return poemRows
+                .filter((row) => String(row.title || "").trim())
+                .map((row) => {
+                    const id = String(row.id || "").trim() || slugify(row.title);
+                    return {
+                        id: id,
+                        title: String(row.title).trim(),
+                        dedicatory: String(row.dedicatory || "").trim(),
+                        author: String(row.author || "").trim() || "Anónimo",
+                        theme: THEMES[row.theme] ? row.theme : "rosa",
+                        lines: linesByPoem[id] || [],
+                        badge: String(row.badge || "").trim() || null,
+                        twoCol: BOOL_TRUE.has(String(row.columns || "").trim().toLowerCase()),
+                        userId: null,
+                    };
+                });
+        };
+
+        // Descarga y lee poemas.xlsx
+        const loadPoemsFromXlsx = async (url) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("No se pudo leer " + url);
+            const workbook = XLSX.read(await res.arrayBuffer(), { type: "array" });
+            return poemsFromWorkbook(workbook);
+        };
+
+        // Normaliza una fila de la tabla de Supabase a un objeto de poema
+        const normalizeDbRow = (r) => ({
             id: r.id,
             title: r.title,
             dedicatory: r.dedicatory || "",
@@ -277,6 +247,17 @@
             badge: r.badge || null,
             twoCol: !!r.columns,
             userId: r.user_id || null,
+        });
+
+        // Convierte un objeto de poema (del Excel) al formato de la tabla
+        const poemToDbRow = (p) => ({
+            title: p.title,
+            dedicatory: p.dedicatory || null,
+            author: p.author || "Anónimo",
+            theme: p.theme,
+            lines: p.lines,
+            badge: p.badge,
+            columns: p.twoCol,
         });
 
         /* ==================================================================
@@ -328,6 +309,12 @@
         const CloseIcon = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+
+        const SheetIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
             </svg>
         );
 
@@ -696,7 +683,7 @@
                         .single();
                     if (error) throw error;
                     showToast("Poema publicado ✨");
-                    onPublished(rowToPoem(data));
+                    onPublished(normalizeDbRow(data));
                 } catch (err) {
                     setError(err.message || "No se pudo publicar");
                 } finally {
@@ -831,8 +818,8 @@
         const App = () => {
             const [view, setView] = useState("menu"); // 'menu' | 'reader' | 'publish'
             const [poemId, setPoemId] = useState(null);
-            const [poems, setPoems] = useState(() => (db ? [] : POEM_SEED));
-            const [loading, setLoading] = useState(!!db);
+            const [poems, setPoems] = useState([]);
+            const [loading, setLoading] = useState(true);
             const [session, setSession] = useState(null);
             const [authModal, setAuthModal] = useState(null); // null | 'login' | 'signup'
             const [toast, setToast] = useState(null);
@@ -849,11 +836,27 @@
                 return () => clearTimeout(t);
             }, [toast]);
 
-            // Sesión + poemas desde la base de datos (con siembra automática)
+            // Carga inicial: los objetos de poema salen de poemas.xlsx.
+            // Si hay Supabase configurado, se intenta la BD y se siembra
+            // con el contenido del Excel la primera vez (tabla vacía).
             useEffect(() => {
-                if (!db) return;
                 let alive = true;
                 (async () => {
+                    let localPoems = [];
+                    try {
+                        localPoems = await loadPoemsFromXlsx(XLSX_FILE);
+                    } catch (err) {
+                        console.error(err);
+                        if (alive) showToast("No se pudo leer poemas.xlsx");
+                    }
+                    if (!alive) return;
+
+                    if (!db) {
+                        setPoems(localPoems);
+                        setLoading(false);
+                        return;
+                    }
+
                     try {
                         const { data } = await db.auth.getSession();
                         if (alive) setSession(data.session ? data.session.user : null);
@@ -867,36 +870,30 @@
                             .order("created_at", { ascending: true });
                         if (error) throw error;
 
-                        // Primera conexión: sembrar los poemas originales
+                        // Primera conexión: sembrar la BD con los poemas del Excel
                         if (!rows || rows.length === 0) {
-                            const { data: created, error: insErr } = await db
-                                .from("poems")
-                                .insert(
-                                    POEM_SEED.map((p) => ({
-                                        title: p.title,
-                                        dedicatory: p.dedicatory,
-                                        author: p.author,
-                                        theme: p.theme,
-                                        lines: p.lines,
-                                        badge: p.badge,
-                                        columns: p.twoCol,
-                                    }))
-                                )
-                                .select();
-                            if (insErr) console.error("Error sembrando poemas:", insErr);
-                            rows = created || [];
+                            if (localPoems.length) {
+                                const { data: created, error: insErr } = await db
+                                    .from("poems")
+                                    .insert(localPoems.map(poemToDbRow))
+                                    .select();
+                                if (insErr) console.error("Error sembrando poemas:", insErr);
+                                rows = created || [];
+                            } else {
+                                rows = [];
+                            }
                         }
 
                         if (alive) {
-                            setPoems(rows.map(rowToPoem));
+                            setPoems(rows.map(normalizeDbRow));
                             setLoading(false);
                         }
                     } catch (err) {
                         console.error(err);
                         if (alive) {
-                            setPoems(POEM_SEED);
+                            setPoems(localPoems); // Sin conexión: el Excel manda
                             setLoading(false);
-                            showToast("No se pudo conectar con la base de datos");
+                            showToast("Sin conexión con la BD: mostrando poemas.xlsx");
                         }
                     }
                 })();
@@ -928,6 +925,39 @@
                 showToast("Poema borrado");
             };
 
+            // Carga poemas desde un archivo .xlsx elegido por el usuario
+            const handleUploadXlsx = async (file) => {
+                try {
+                    const imported = poemsFromWorkbook(XLSX.read(await file.arrayBuffer(), { type: "array" }));
+                    if (!imported.length) { showToast("El Excel no contiene poemas"); return; }
+
+                    if (!db) {
+                        setPoems(imported);
+                        setView("menu");
+                        showToast(`Cargados ${imported.length} poemas del Excel`);
+                        return;
+                    }
+
+                    // En BD: añade solo los poemas cuyo título no exista aún
+                    const { data: existing, error: selErr } = await db.from("poems").select("title");
+                    if (selErr) throw selErr;
+                    const titles = new Set((existing || []).map((r) => r.title));
+                    const nuevos = imported
+                        .filter((p) => !titles.has(p.title))
+                        .map((p) => ({ ...poemToDbRow(p), user_id: session ? session.id : null }));
+
+                    if (!nuevos.length) { showToast("Todos los poemas del Excel ya existen"); return; }
+
+                    const { data: created, error } = await db.from("poems").insert(nuevos).select();
+                    if (error) throw error;
+                    setPoems((prev) => [...prev, ...(created || []).map(normalizeDbRow)]);
+                    showToast(`${created.length} poemas añadidos desde el Excel`);
+                } catch (err) {
+                    console.error(err);
+                    showToast("No se pudo leer el Excel");
+                }
+            };
+
             return (
                 <div className="min-h-screen relative flex flex-col items-center p-4 md:p-8">
                     <Backdrop themeKey={themeKey} />
@@ -935,7 +965,7 @@
                     {/* Aviso de modo local */}
                     {!db && view === "menu" && (
                         <div className="relative z-10 w-full max-w-4xl mb-4 text-center text-xs md:text-sm bg-amber-500/15 border border-amber-300/30 text-amber-200 rounded-2xl px-4 py-2">
-                            Modo local: añade tus claves de Supabase en <b>index.html</b> (y ejecuta <b>supabase-setup.sql</b>) para activar el login y publicar poemas.
+                            Modo local: los poemas salen de <b>poemas.xlsx</b>. Añade tus claves de Supabase en <b>index.html</b> (y ejecuta <b>supabase-setup.sql</b>) para activar el login y publicar en línea.
                         </div>
                     )}
 
@@ -953,6 +983,24 @@
                         </button>
 
                         <div className="flex items-center gap-2">
+                            {/* Cargar Excel: en modo local siempre; con BD, solo usuarios con sesión */}
+                            {(session || !db) && (
+                                <label className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 font-medium text-sm transition-all active:scale-95 cursor-pointer">
+                                    <SheetIcon className="w-4 h-4" />
+                                    Cargar Excel
+                                    <input
+                                        type="file"
+                                        accept=".xlsx,.xls"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files && e.target.files[0];
+                                            if (file) handleUploadXlsx(file);
+                                            e.target.value = "";
+                                        }}
+                                    />
+                                </label>
+                            )}
+
                             <button
                                 onClick={() => {
                                     if (!requireDb()) return;
@@ -1011,7 +1059,7 @@
                                     {!db && (
                                         <div className="animate-fade-up rounded-3xl border border-dashed border-white/20 flex flex-col items-center justify-center p-8 text-center text-white/40" style={{ animationDelay: `${poems.length * 90}ms` }}>
                                             <PenIcon className="w-8 h-8 mb-3" />
-                                            <p className="text-sm">Conecta Supabase para publicar los tuyos</p>
+                                            <p className="text-sm">Añade más poemas editando poemas.xlsx o con “Cargar Excel”</p>
                                         </div>
                                     )}
                                 </div>
